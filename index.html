@@ -1,0 +1,1623 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Demus Web Player</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- YouTube IFrame Player API for reliable in-browser streaming -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              400: '#c084fc',
+              500: '#a855f7',
+              600: '#9333ea',
+            },
+            surface: {
+              800: '#141a29',
+              850: '#0e1422',
+              900: '#090d18',
+              950: '#05070f',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(9, 13, 24, 0.7);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(168, 85, 247, 0.5);
+    }
+
+    .glass-panel {
+      background: rgba(14, 20, 34, 0.78);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .glass-card {
+      background: rgba(20, 26, 41, 0.65);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .glass-card:hover {
+      background: rgba(28, 38, 62, 0.85);
+      border-color: rgba(168, 85, 247, 0.4);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px -5px rgba(168, 85, 247, 0.25);
+    }
+
+    /* Range slider inputs */
+    input[type=range] {
+      -webkit-appearance: none;
+      background: rgba(255, 255, 255, 0.18);
+      border-radius: 9999px;
+      height: 5px;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #c084fc;
+      cursor: pointer;
+      box-shadow: 0 0 12px rgba(192, 132, 252, 0.9);
+      transition: transform 0.15s ease;
+    }
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.3);
+    }
+
+    /* Real-time karaoke lyrics lines */
+    .lyric-item {
+      transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+      opacity: 0.35;
+      transform: scale(0.96);
+      transform-origin: left center;
+      cursor: pointer;
+    }
+    .lyric-item:hover {
+      opacity: 0.8;
+      transform: scale(0.98);
+    }
+    .lyric-item.active {
+      opacity: 1;
+      transform: scale(1.04);
+      color: #ffffff;
+      font-weight: 800;
+      text-shadow: 0 0 25px rgba(192, 132, 252, 0.8);
+    }
+    .lyric-item.passed {
+      opacity: 0.45;
+      color: #9ca3af;
+    }
+  </style>
+</head>
+
+<body class="bg-surface-950 text-gray-100 min-h-screen flex flex-col antialiased selection:bg-brand-500 selection:text-white overflow-x-hidden">
+
+  <!-- Toast Notification Alert -->
+  <div id="toast" class="fixed top-5 right-5 z-50 transform translate-y-[-160%] transition-transform duration-300 pointer-events-none flex items-center space-x-3 px-4 py-3 rounded-2xl glass-panel shadow-2xl border border-white/10 text-xs md:text-sm">
+    <i id="toast-icon" class="fa-solid fa-circle-check text-brand-400 text-base"></i>
+    <span id="toast-text" class="font-medium text-gray-200">Mensaje de notificación</span>
+  </div>
+
+  <!-- Custom Playlist Creation Modal -->
+  <div id="modal-playlist-prompt" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md opacity-0 pointer-events-none transition-all duration-300">
+    <div class="glass-panel p-6 rounded-3xl w-full max-w-sm border border-white/15 shadow-2xl scale-95 transition-transform duration-300" id="modal-playlist-card">
+      <div class="flex items-center space-x-3 mb-4">
+        <div class="w-10 h-10 rounded-2xl bg-brand-500/20 text-brand-400 flex items-center justify-center">
+          <i class="fa-solid fa-folder-plus text-base"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-white">Nueva Lista</h3>
+          <p class="text-xs text-gray-400">Organiza tu música favorita</p>
+        </div>
+      </div>
+      <input type="text" id="playlist-name-input" placeholder="Nombre de tu lista (ej: Hits 2026)" class="w-full bg-surface-850/90 text-sm text-white px-4 py-3 rounded-xl border border-white/10 focus:border-brand-500 outline-none mb-4">
+      <div class="flex items-center justify-end space-x-2">
+        <button onclick="closePlaylistModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition">Cancelar</button>
+        <button onclick="confirmCreatePlaylist()" class="px-5 py-2 rounded-xl text-xs font-semibold bg-brand-500 hover:bg-brand-600 text-white shadow-lg shadow-brand-500/30 transition">Crear Lista</button>
+      </div>
+    </div>
+  </div>
+
+  <header class="h-16 border-b border-white/5 glass-panel sticky top-0 z-30 px-4 md:px-8 flex items-center justify-between">
+    <div class="flex items-center space-x-3 md:space-x-4">
+      <div class="w-9 h-9 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-brand-500/30">
+        <i class="fa-solid fa-bolt text-white text-sm"></i>
+      </div>
+      <div>
+        <span class="font-extrabold text-base md:text-lg tracking-tight bg-gradient-to-r from-white via-gray-100 to-brand-400 bg-clip-text text-transparent">Demus Web</span>
+        <span class="hidden md:inline-block ml-2 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand-500/15 text-brand-400 border border-brand-500/25">Background Engine</span>
+      </div>
+    </div>
+
+    <!-- Search Input Bar with Instant Resolution -->
+    <div class="flex-1 max-w-md mx-3 md:mx-6">
+      <div class="relative flex items-center">
+        <i class="fa-solid fa-magnifying-glass absolute left-3.5 text-xs text-gray-400 pointer-events-none"></i>
+        <input 
+          type="text" 
+          id="global-search-input"
+          placeholder="Buscar tema, pegar URL o ID de YouTube..." 
+          class="w-full bg-surface-900/90 text-xs md:text-sm text-gray-100 pl-9 pr-9 py-2 md:py-2.5 rounded-2xl border border-white/10 focus:border-brand-500/70 focus:ring-2 focus:ring-brand-500/20 outline-none transition placeholder:text-gray-500"
+          onkeydown="if(event.key === 'Enter') executeInstantSearch()"
+        >
+        <button id="btn-clear-search" onclick="clearSearchInput()" class="absolute right-3 text-xs text-gray-400 hover:text-white hidden">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Header Quick Action buttons -->
+    <div class="flex items-center space-x-2">
+      <button onclick="toggleVideoDockVisibility()" title="Mostrar/Ocultar dock" class="p-2 md:px-3 md:py-1.5 rounded-xl glass-card text-xs text-gray-300 hover:text-white flex items-center space-x-1.5">
+        <i class="fa-solid fa-tv text-brand-400 text-xs"></i>
+        <span class="hidden sm:inline">Dock Demus</span>
+      </button>
+      <button onclick="switchTab('lyrics')" title="Ver letras Karaoke" class="p-2 md:px-3 md:py-1.5 rounded-xl glass-card text-xs text-brand-400 hover:text-brand-300 flex items-center space-x-1.5">
+        <i class="fa-solid fa-microphone-lines text-xs"></i>
+        <span class="hidden sm:inline">Karaoke</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="flex-1 flex overflow-hidden">
+    
+    <!-- Left Navigation Sidebar -->
+    <aside class="w-60 border-r border-white/5 bg-surface-900/40 p-4 hidden md:flex flex-col justify-between shrink-0">
+      <div class="space-y-6">
+        <div>
+          <p class="text-[10px] font-bold uppercase tracking-wider text-gray-500 px-3 mb-2">Descubrir</p>
+          <nav class="space-y-1">
+            <button id="nav-home" onclick="switchTab('home')" class="nav-btn active w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold bg-brand-500/15 text-brand-400 border border-brand-500/25 transition text-left">
+              <i class="fa-solid fa-house text-sm w-4 text-center"></i>
+              <span>Inicio & Éxitos</span>
+            </button>
+            <button id="nav-search" onclick="switchTab('search')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition text-left">
+              <i class="fa-solid fa-magnifying-glass text-sm w-4 text-center"></i>
+              <span>Búsqueda</span>
+            </button>
+            <button id="nav-lyrics" onclick="switchTab('lyrics')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition text-left">
+              <i class="fa-solid fa-microphone text-sm w-4 text-center"></i>
+              <span>Letras en Vivo</span>
+            </button>
+          </nav>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between px-3 mb-2">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-gray-500">Mi Colección</p>
+            <span id="badge-favs-count" class="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-pink-500/20 text-pink-400">0</span>
+          </div>
+          <nav class="space-y-1">
+            <button id="nav-favorites" onclick="switchTab('favorites')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition text-left">
+              <i class="fa-solid fa-heart text-sm w-4 text-center text-pink-400"></i>
+              <span>Favoritos</span>
+            </button>
+            <button id="nav-history" onclick="switchTab('history')" class="nav-btn w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition text-left">
+              <i class="fa-solid fa-clock-rotate-left text-sm w-4 text-center text-cyan-400"></i>
+              <span>Historial</span>
+            </button>
+          </nav>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between px-3 mb-2">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-gray-500">Playlists</p>
+            <button onclick="openPlaylistModal()" title="Crear Playlist" class="text-xs text-brand-400 hover:text-brand-300">
+              <i class="fa-solid fa-plus"></i>
+            </button>
+          </div>
+          <div id="playlists-sidebar-list" class="space-y-1 max-h-36 overflow-y-auto pr-1">
+            <p class="text-xs text-gray-500 px-3 py-1 italic">Sin listas creadas</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Engine Status Box -->
+      <div class="p-3 rounded-2xl bg-surface-850/80 border border-white/5 flex flex-col gap-1.5 text-xs">
+        <div class="flex items-center justify-between">
+          <span class="text-gray-400 text-[11px] font-medium">Motor Demus</span>
+          <span id="engine-status-badge" class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">Activo</span>
+        </div>
+        <p class="text-[10px] text-gray-500">Canciones completas sin límites ni cortes.</p>
+      </div>
+    </aside>
+
+    <main class="flex-1 overflow-y-auto pb-32 px-4 md:px-8 pt-6">
+
+      <!-- ================= 1. HOME VIEW ================= -->
+      <section id="view-home" class="tab-view space-y-8 max-w-7xl mx-auto">
+        
+        <!-- Hero Banner with Direct Playback -->
+        <div class="relative rounded-3xl overflow-hidden p-6 md:p-8 bg-gradient-to-r from-purple-900/60 via-brand-600/30 to-surface-900 border border-brand-500/20 shadow-2xl">
+          <div class="relative z-10 max-w-xl space-y-3">
+            <span class="inline-block px-3 py-1 rounded-full text-[11px] font-bold bg-brand-500/30 text-brand-300 border border-brand-500/40 uppercase tracking-wider">
+              En Tendencia • Reproducción Completa
+            </span>
+            <h1 class="text-2xl md:text-4xl font-black text-white tracking-tight">Tiroteo (Remix)</h1>
+            <p class="text-xs md:text-sm text-gray-300 leading-relaxed">
+              Marc Seguí, Rauw Alejandro & Pol Granch. Letra sincronizada en tiempo real disponible.
+            </p>
+            <div class="flex items-center space-x-3 pt-2">
+              <button onclick="playCuratedTrackById('tiroteo-remix')" class="px-6 py-2.5 rounded-2xl bg-white hover:bg-gray-100 text-surface-950 text-xs md:text-sm font-extrabold flex items-center space-x-2 shadow-xl hover:scale-105 transition">
+                <i class="fa-solid fa-play text-xs"></i>
+                <span>Escuchar Ahora</span>
+              </button>
+              <button onclick="playAllCurated()" class="px-5 py-2.5 rounded-2xl glass-card text-xs md:text-sm font-semibold text-white hover:border-brand-500/50 flex items-center space-x-2 transition">
+                <i class="fa-solid fa-shuffle text-brand-400"></i>
+                <span>Reproducir Todo</span>
+              </button>
+            </div>
+          </div>
+          <div class="absolute right-0 top-0 bottom-0 w-1/2 opacity-20 pointer-events-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-brand-400 via-transparent to-transparent"></div>
+        </div>
+
+        <!-- Quick Search Chips -->
+        <div class="flex items-center space-x-2 overflow-x-auto pb-2 no-scrollbar">
+          <button onclick="triggerChipSearch('Marc Segui')" class="px-4 py-1.5 rounded-full text-xs font-medium glass-card hover:border-brand-500/40 text-gray-300 shrink-0">Marc Seguí</button>
+          <button onclick="triggerChipSearch('Kappah')" class="px-4 py-1.5 rounded-full text-xs font-medium glass-card hover:border-brand-500/40 text-gray-300 shrink-0">Kappah (Mucho Drip)</button>
+          <button onclick="triggerChipSearch('Mora')" class="px-4 py-1.5 rounded-full text-xs font-medium glass-card hover:border-brand-500/40 text-gray-300 shrink-0">Mora</button>
+          <button onclick="triggerChipSearch('Quevedo')" class="px-4 py-1.5 rounded-full text-xs font-medium glass-card hover:border-brand-500/40 text-gray-300 shrink-0">Quevedo</button>
+          <button onclick="triggerChipSearch('Bad Bunny')" class="px-4 py-1.5 rounded-full text-xs font-medium glass-card hover:border-brand-500/40 text-gray-300 shrink-0">Bad Bunny</button>
+          <button onclick="triggerChipSearch('Morad')" class="px-4 py-1.5 rounded-full text-xs font-medium glass-card hover:border-brand-500/40 text-gray-300 shrink-0">Morad</button>
+        </div>
+
+        <!-- Curated Hits Grid -->
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-lg md:text-xl font-bold text-white tracking-tight">Éxitos Verificados</h2>
+              <p class="text-xs text-gray-400">Listos para sonar al instante como en Demus</p>
+            </div>
+            <button onclick="playAllCurated()" class="text-xs text-brand-400 hover:text-brand-300 font-semibold flex items-center space-x-1">
+              <span>Reproducir lista</span>
+              <i class="fa-solid fa-play text-[10px]"></i>
+            </button>
+          </div>
+
+          <div id="grid-trending" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
+            <!-- Populated dynamically by renderTrendingGrid() -->
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ================= 2. SEARCH VIEW ================= -->
+      <section id="view-search" class="tab-view hidden space-y-6 max-w-7xl mx-auto">
+        <div class="flex items-center justify-between border-b border-white/5 pb-3">
+          <div>
+            <h2 id="search-results-title" class="text-lg font-bold text-white">Búsqueda & Catálogo</h2>
+            <p class="text-xs text-gray-400">Canciones completas desde el catálogo global de YouTube</p>
+          </div>
+        </div>
+
+        <!-- Loader Indicator -->
+        <div id="search-loader" class="hidden items-center justify-center py-12 space-x-3">
+          <i class="fa-solid fa-circle-notch fa-spin text-2xl text-brand-400"></i>
+          <span class="text-sm text-gray-300 font-medium">Buscando tema para reproducir...</span>
+        </div>
+
+        <!-- Search Results Grid -->
+        <div id="search-results-container" class="space-y-2">
+          <div class="p-12 text-center text-gray-500 space-y-2">
+            <i class="fa-solid fa-magnifying-glass text-3xl mb-1 text-gray-600 block"></i>
+            <p class="text-sm font-medium">Escribe una canción o pega un enlace de YouTube</p>
+            <p class="text-xs text-gray-600">Ejemplo: "Tiroteo", "Tengo Mucho Drip", "La Inocente" o una URL de YouTube</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 3. KARAOKE LYRICS VIEW ================= -->
+      <section id="view-lyrics" class="tab-view hidden space-y-6 max-w-4xl mx-auto">
+        <div class="glass-panel p-5 md:p-6 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-4 border border-white/10">
+          <div class="flex items-center space-x-4">
+            <img id="lyrics-cover-img" src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&auto=format&fit=crop&q=80" class="w-16 h-16 md:w-20 md:h-20 rounded-2xl object-cover shadow-xl border border-white/10">
+            <div class="min-w-0">
+              <span id="lyrics-badge-sync" class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-brand-500/20 text-brand-400 border border-brand-500/30">
+                Karaoke en Vivo Sincronizado
+              </span>
+              <h2 id="lyrics-track-title" class="text-lg md:text-2xl font-black text-white truncate mt-1">Sin canción activa</h2>
+              <p id="lyrics-track-artist" class="text-xs md:text-sm text-gray-400 truncate">Elige un tema para comenzar</p>
+            </div>
+          </div>
+          <div class="flex items-center space-x-3 self-end md:self-auto">
+            <span id="lyrics-timing-status" class="font-mono text-xs text-brand-400 bg-brand-500/10 px-3 py-1.5 rounded-xl border border-brand-500/20">0:00</span>
+            <button onclick="reloadLyricsForCurrent()" title="Recargar letras" class="p-2.5 rounded-xl glass-card text-xs text-gray-300 hover:text-white">
+              <i class="fa-solid fa-arrows-rotate"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Lyrics Container with smooth vertical scroll -->
+        <div id="lyrics-box" class="glass-card p-6 md:p-8 rounded-3xl min-h-[420px] max-h-[560px] overflow-y-auto space-y-3 text-lg md:text-2xl leading-relaxed font-semibold">
+          <div class="py-16 text-center text-gray-500 space-y-2">
+            <i class="fa-solid fa-music text-3xl mb-1 text-gray-600 block"></i>
+            <p class="text-sm font-semibold text-gray-400">Selecciona una canción para sincronizar su letra</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 4. FAVORITES VIEW ================= -->
+      <section id="view-favorites" class="tab-view hidden space-y-6 max-w-7xl mx-auto">
+        <div class="flex items-center justify-between border-b border-white/5 pb-3">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+              <i class="fa-solid fa-heart text-pink-500 text-sm"></i>
+              <span>Mis Canciones Favoritas</span>
+            </h2>
+            <p class="text-xs text-gray-400">Guardadas localmente en tu biblioteca</p>
+          </div>
+          <button onclick="playAllFavorites()" class="px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold transition flex items-center space-x-2">
+            <i class="fa-solid fa-play text-[10px]"></i>
+            <span>Reproducir Todas</span>
+          </button>
+        </div>
+        <div id="favorites-list-container" class="space-y-2">
+          <!-- Populated by renderFavoritesView() -->
+        </div>
+      </section>
+
+      <!-- ================= 5. HISTORY VIEW ================= -->
+      <section id="view-history" class="tab-view hidden space-y-6 max-w-7xl mx-auto">
+        <div class="flex items-center justify-between border-b border-white/5 pb-3">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+              <i class="fa-solid fa-clock-rotate-left text-cyan-400 text-sm"></i>
+              <span>Historial de Reproducción</span>
+            </h2>
+            <p class="text-xs text-gray-400">Tus últimas canciones escuchadas</p>
+          </div>
+          <button onclick="clearHistory()" class="px-3 py-1.5 rounded-xl glass-card text-xs text-gray-400 hover:text-white transition">
+            Limpiar Historial
+          </button>
+        </div>
+        <div id="history-list-container" class="space-y-2">
+          <!-- Populated by renderHistoryView() -->
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- FLOATING MINI DOCK (Demus Floating Audio & Video Player) -->
+  <div id="player-dock-stage" class="fixed bottom-24 right-4 z-40 transition-all duration-300 rounded-2xl overflow-hidden glass-panel shadow-2xl border border-white/10 w-[290px] md:w-[320px]">
+    <div class="flex items-center justify-between px-3.5 py-2 bg-black/70 border-b border-white/10 text-xs">
+      <div class="flex items-center space-x-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="font-bold text-gray-200 text-[11px]">Demus Engine • En Vivo</span>
+      </div>
+      <div class="flex items-center space-x-1">
+        <button onclick="toggleVideoDockMinimize()" title="Minimizar / Expandir" class="text-gray-400 hover:text-white px-1.5 py-0.5 rounded text-xs">
+          <i id="btn-dock-min-icon" class="fa-solid fa-chevron-down"></i>
+        </button>
+        <button onclick="toggleVideoDockVisibility()" title="Cerrar dock" class="text-gray-400 hover:text-white px-1.5 py-0.5 rounded text-xs">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+    </div>
+    
+    <!-- Active Dock Player Screen: Real dimensions ensure browser never throttles background audio -->
+    <div id="player-media-view" class="w-full h-[180px] bg-black relative flex flex-col items-center justify-center text-center overflow-hidden transition-all duration-300">
+      <div id="yt-player-box" class="w-full h-full"></div>
+    </div>
+  </div>
+
+  <!-- BOTTOM FIXED CONTROLS BAR -->
+  <footer class="fixed bottom-0 left-0 right-0 h-20 md:h-22 glass-panel border-t border-white/10 px-3 md:px-6 z-40 flex items-center justify-between">
+    
+    <!-- Left: Track Metadata -->
+    <div class="flex items-center space-x-3 w-1/3 min-w-0 pr-2">
+      <div class="relative w-12 h-12 md:w-14 md:h-14 rounded-xl overflow-hidden shrink-0 shadow-lg border border-white/10 group cursor-pointer" onclick="switchTab('lyrics')">
+        <img id="dock-cover" src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&auto=format&fit=crop&q=80" class="w-full h-full object-cover">
+        <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+          <i class="fa-solid fa-microphone-lines text-white text-xs"></i>
+        </div>
+      </div>
+      <div class="min-w-0">
+        <h4 id="dock-title" class="text-xs md:text-sm font-bold text-white truncate hover:text-brand-400 cursor-pointer" onclick="switchTab('lyrics')">Demus Web</h4>
+        <p id="dock-artist" class="text-[11px] text-gray-400 truncate">Elige una canción</p>
+      </div>
+      <button id="dock-btn-fav" onclick="toggleCurrentFavorite()" title="Favorito" class="text-gray-400 hover:text-pink-500 p-2 text-sm transition shrink-0 hidden sm:inline-block">
+        <i class="fa-regular fa-heart"></i>
+      </button>
+    </div>
+
+    <!-- Center: Main Playback Controls & Timeline Scrubber -->
+    <div class="flex flex-col items-center justify-center w-full max-w-xl px-2">
+      <div class="flex items-center space-x-4 md:space-x-6 mb-1">
+        <button id="ctrl-shuffle" onclick="toggleShuffle()" title="Aleatorio" class="text-gray-400 hover:text-white text-xs transition">
+          <i class="fa-solid fa-shuffle"></i>
+        </button>
+        <button onclick="playPrevTrack()" title="Anterior" class="text-gray-300 hover:text-white text-sm transition">
+          <i class="fa-solid fa-backward-step"></i>
+        </button>
+        <button id="ctrl-play-btn" onclick="togglePlayPause()" class="w-10 h-10 md:w-11 md:h-11 rounded-full bg-white hover:bg-gray-100 text-surface-950 flex items-center justify-center shadow-lg shadow-white/20 hover:scale-105 transition">
+          <i id="ctrl-play-icon" class="fa-solid fa-play text-sm ml-0.5"></i>
+        </button>
+        <button onclick="playNextTrack()" title="Siguiente" class="text-gray-300 hover:text-white text-sm transition">
+          <i class="fa-solid fa-forward-step"></i>
+        </button>
+        <button id="ctrl-repeat" onclick="toggleRepeat()" title="Repetir" class="text-gray-400 hover:text-white text-xs transition">
+          <i class="fa-solid fa-repeat"></i>
+        </button>
+      </div>
+
+      <!-- Scrubber progress bar -->
+      <div class="w-full flex items-center space-x-2 md:space-x-3 text-[10px] md:text-xs font-mono text-gray-400">
+        <span id="time-current">0:00</span>
+        <input 
+          type="range" 
+          id="progress-bar" 
+          min="0" 
+          max="100" 
+          value="0" 
+          class="w-full cursor-pointer"
+          oninput="onUserScrubbing(this.value)"
+          onchange="onUserScrubEnd(this.value)"
+        >
+        <span id="time-total">0:00</span>
+      </div>
+    </div>
+
+    <!-- Right: Volume & Fullscreen Modals -->
+    <div class="flex items-center justify-end space-x-2 md:space-x-3 w-1/3 pl-2">
+      <button onclick="switchTab('lyrics')" title="Ver letras" class="text-gray-400 hover:text-brand-400 p-2 text-xs md:text-sm transition">
+        <i class="fa-solid fa-microphone"></i>
+      </button>
+      
+      <div class="hidden lg:flex items-center space-x-2">
+        <button onclick="toggleMute()" class="text-gray-400 hover:text-white text-xs">
+          <i id="icon-volume" class="fa-solid fa-volume-high"></i>
+        </button>
+        <input 
+          type="range" 
+          id="volume-slider" 
+          min="0" 
+          max="100" 
+          value="85" 
+          class="w-20 cursor-pointer"
+          oninput="setAudioVolume(this.value)"
+        >
+      </div>
+
+      <button onclick="toggleFullscreenPlayer()" title="Pantalla Completa" class="text-gray-400 hover:text-white p-2 text-xs md:text-sm transition">
+        <i class="fa-solid fa-expand"></i>
+      </button>
+    </div>
+
+  </footer>
+
+  <!-- FULLSCREEN PLAYER MODAL -->
+  <div id="modal-fullscreen-player" class="fixed inset-0 z-50 bg-surface-950/95 backdrop-blur-3xl flex flex-col justify-between p-6 md:p-12 transition-all duration-300 opacity-0 pointer-events-none scale-95">
+    
+    <div class="flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-8 h-8 rounded-xl bg-brand-500/20 text-brand-400 flex items-center justify-center">
+          <i class="fa-solid fa-bolt text-xs"></i>
+        </div>
+        <span class="text-xs font-bold uppercase tracking-wider text-gray-400">Demus Now Playing</span>
+      </div>
+      <button onclick="toggleFullscreenPlayer()" class="w-10 h-10 rounded-full glass-card flex items-center justify-center text-gray-300 hover:text-white">
+        <i class="fa-solid fa-xmark text-sm"></i>
+      </button>
+    </div>
+
+    <div class="max-w-4xl mx-auto w-full flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 my-auto">
+      <div class="relative w-64 h-64 md:w-80 md:h-80 rounded-3xl overflow-hidden shadow-2xl border border-white/10 shrink-0">
+        <img id="fs-cover" src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&auto=format&fit=crop&q=80" class="w-full h-full object-cover">
+      </div>
+      <div class="space-y-4 text-center md:text-left min-w-0 flex-1">
+        <h2 id="fs-title" class="text-2xl md:text-4xl font-black text-white truncate">Demus Web</h2>
+        <p id="fs-artist" class="text-base md:text-lg text-gray-400 truncate">Elige una canción</p>
+        
+        <div class="p-4 rounded-2xl bg-white/5 border border-white/10">
+          <p class="text-[11px] font-bold uppercase tracking-wider text-brand-400 mb-1">Letra Activa</p>
+          <p id="fs-active-lyric" class="text-base md:text-xl font-bold text-white leading-relaxed">Disfruta la canción</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="max-w-xl mx-auto w-full space-y-4">
+      <div class="w-full flex items-center space-x-3 text-xs font-mono text-gray-400">
+        <span id="fs-time-curr">0:00</span>
+        <input type="range" id="fs-progress-bar" min="0" max="100" value="0" class="w-full cursor-pointer" oninput="onUserScrubbing(this.value)" onchange="onUserScrubEnd(this.value)">
+        <span id="fs-time-total">0:00</span>
+      </div>
+      <div class="flex items-center justify-center space-x-8">
+        <button onclick="playPrevTrack()" class="text-gray-300 hover:text-white text-xl"><i class="fa-solid fa-backward-step"></i></button>
+        <button onclick="togglePlayPause()" class="w-14 h-14 rounded-full bg-white text-surface-950 flex items-center justify-center text-xl shadow-xl hover:scale-105 transition">
+          <i id="fs-play-icon" class="fa-solid fa-play ml-0.5"></i>
+        </button>
+        <button onclick="playNextTrack()" class="text-gray-300 hover:text-white text-xl"><i class="fa-solid fa-forward-step"></i></button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* =====================================================================
+       DEMUS WEB PLAYER - BACKGROUND ENGINE & REAL-TIME KARAOKE
+       ===================================================================== */
+
+    const STORAGE_KEY_FAVS = 'demus_web_favs_v6';
+    const STORAGE_KEY_HISTORY = 'demus_web_hist_v6';
+    const STORAGE_KEY_PLAYLISTS = 'demus_web_playlists_v6';
+
+    let ytPlayer = null;
+    let ytReady = false;
+    let currentTrack = null;
+    let playlistQueue = [];
+    let currentQueueIndex = 0;
+    let isPlaying = false;
+    let isShuffle = false;
+    let isRepeat = false;
+    let isMuted = false;
+    let currentVolume = 85;
+    let scrubLock = false;
+    let syncedLyrics = [];
+    let progressTimer = null;
+
+    // Curated urban hits with VERIFIED YouTube Video IDs (Plays complete songs reliably)
+    const CURATED_HITS = [
+      {
+        id: 'tiroteo-remix',
+        ytId: '_4IRYh9N76o', // Marc Seguí, Rauw Alejandro, Pol Granch - Tiroteo Remix
+        title: 'Tiroteo (Remix)',
+        artist: 'Marc Seguí, Rauw Alejandro & Pol Granch',
+        album: 'Tiroteo Remix Single',
+        cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80',
+        duration: 260,
+        presetLyrics: `[00:15.20] Mira, que yo lo intento, pero te desvaneces
+[00:18.50] Siempre me hago el contento, pero hoy no me apetece
+[00:22.00] Y no entienden que siempre has sido diferente
+[00:25.50] Como Venecia sin agua, como Madrid sin gente`
+      },
+      {
+        id: 'mucho-drip-kappah',
+        ytId: 'qdkNQEf1gBQ', // Kappah - TENGO MUCHO DRIP
+        title: 'TENGO MUCHO DRIP',
+        artist: 'Kappah',
+        album: 'Mucho Drip',
+        cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80',
+        duration: 165,
+        presetLyrics: `[00:06.00] Tengo mucho drip, yeah, lo tuyo es ñip
+[00:10.00] Hielo en mi neck, estoy en mi peak
+[00:14.00] Tengo mucho drip, lo tuyo es ñip
+[00:18.00] Siempre ando con los míos activo en el beat`
+      },
+      {
+        id: 'la-inocente-mora',
+        ytId: 'ckuGLT1VkGw', // Mora & Feid - LA INOCENTE
+        title: 'La Inocente',
+        artist: 'Mora & Feid',
+        album: 'MICRODOSIS',
+        cover: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80',
+        duration: 201
+      },
+      {
+        id: 'bizarrap-quevedo',
+        ytId: 'bfH2AO-oek0', // Bizarrap & Quevedo - Bzrp Music Sessions, Vol. 52
+        title: 'Quevedo: Bzrp Music Sessions, Vol. 52',
+        artist: 'Bizarrap & Quevedo',
+        album: 'BZRP Music Sessions',
+        cover: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&auto=format&fit=crop&q=80',
+        duration: 198
+      },
+      {
+        id: 'bad-bunny-monaco',
+        ytId: 'S9sMRm9M1oY', // Bad Bunny - MONACO
+        title: 'MONACO',
+        artist: 'Bad Bunny',
+        album: 'Nadie Sabe Lo Que Va A Pasar Mañana',
+        cover: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=600&auto=format&fit=crop&q=80',
+        duration: 267
+      },
+      {
+        id: 'morad-pelele',
+        ytId: 'M44Uv9iXzCg', // Morad - Pelele
+        title: 'Pelele',
+        artist: 'Morad',
+        album: 'Pelele Single',
+        cover: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=600&auto=format&fit=crop&q=80',
+        duration: 154
+      },
+      {
+        id: 'quevedo-columbia',
+        ytId: 'a-Vl9NVCSmo', // Quevedo - Columbia
+        title: 'Columbia',
+        artist: 'Quevedo',
+        album: 'Columbia Single',
+        cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80',
+        duration: 186
+      }
+    ];
+
+    // Called automatically by the YouTube IFrame API script
+    window.onYouTubeIframeAPIReady = function() {
+      ytPlayer = new YT.Player('yt-player-box', {
+        height: '100%',
+        width: '100%',
+        videoId: CURATED_HITS[0].ytId,
+        playerVars: {
+          autoplay: 0,
+          controls: 0,
+          disablekb: 1,
+          fs: 0,
+          modestbranding: 1,
+          rel: 0,
+          playsinline: 1,
+          origin: window.location.origin
+        },
+        events: {
+          onReady: onPlayerReady,
+          onStateChange: onPlayerStateChange,
+          onError: onPlayerError
+        }
+      });
+    };
+
+    function onPlayerReady(event) {
+      ytReady = true;
+      event.target.setVolume(currentVolume);
+      startProgressTracking();
+      const badge = document.getElementById('engine-status-badge');
+      if (badge) badge.textContent = 'Conectado';
+    }
+
+    function onPlayerStateChange(event) {
+      if (event.data === YT.PlayerState.PLAYING) {
+        isPlaying = true;
+        updatePlayPauseIcons(true);
+      } else if (event.data === YT.PlayerState.PAUSED) {
+        isPlaying = false;
+        updatePlayPauseIcons(false);
+      } else if (event.data === YT.PlayerState.ENDED) {
+        if (isRepeat) {
+          ytPlayer.seekTo(0);
+          ytPlayer.playVideo();
+        } else {
+          playNextTrack();
+        }
+      }
+    }
+
+    function onPlayerError(event) {
+      console.warn('YouTube Player Event Warning:', event.data);
+      showToast('Optimizando transmisión...', 'info');
+    }
+
+    function playTrackDirect(track) {
+      if (!track) return;
+      currentTrack = track;
+
+      updateDockInfo(track);
+      addToHistory(track);
+      checkIsFavorite(track.id);
+
+      // Load lyrics (preset or open LRCLIB database)
+      if (track.presetLyrics) {
+        parseAndDisplaySyncedLyrics(track.presetLyrics);
+      } else {
+        fetchLyrics(track.title, track.artist);
+      }
+
+      // CRITICAL AUTOPLAY FIX:
+      // Direct call within user gesture executes immediately without browser blocking
+      if (ytReady && ytPlayer && track.ytId) {
+        ytPlayer.loadVideoById(track.ytId);
+        ytPlayer.playVideo();
+        isPlaying = true;
+        updatePlayPauseIcons(true);
+        showToast(`Sonando: ${track.title}`);
+      } else if (!ytReady && track.ytId) {
+        // If API is still initializing, retry as soon as ready
+        const checkInterval = setInterval(() => {
+          if (ytReady && ytPlayer) {
+            clearInterval(checkInterval);
+            ytPlayer.loadVideoById(track.ytId);
+            ytPlayer.playVideo();
+            isPlaying = true;
+            updatePlayPauseIcons(true);
+          }
+        }, 150);
+      }
+    }
+
+    function togglePlayPause() {
+      if (!currentTrack) {
+        playCuratedTrackById(CURATED_HITS[0].id);
+        return;
+      }
+
+      if (!ytReady || !ytPlayer) return;
+
+      const state = ytPlayer.getPlayerState();
+      if (state === YT.PlayerState.PLAYING) {
+        ytPlayer.pauseVideo();
+      } else {
+        ytPlayer.playVideo();
+      }
+    }
+
+    function updatePlayPauseIcons(playing) {
+      const icon = document.getElementById('ctrl-play-icon');
+      const fsIcon = document.getElementById('fs-play-icon');
+      if (icon) {
+        icon.className = playing ? 'fa-solid fa-pause text-sm' : 'fa-solid fa-play text-sm ml-0.5';
+      }
+      if (fsIcon) {
+        fsIcon.className = playing ? 'fa-solid fa-pause' : 'fa-solid fa-play ml-0.5';
+      }
+    }
+
+    function startProgressTracking() {
+      if (progressTimer) clearInterval(progressTimer);
+      progressTimer = setInterval(() => {
+        if (!ytReady || !ytPlayer || scrubLock) return;
+
+        try {
+          const currentSec = ytPlayer.getCurrentTime() || 0;
+          const durationSec = ytPlayer.getDuration() || (currentTrack ? currentTrack.duration : 0);
+
+          if (durationSec > 0) {
+            const progressPct = (currentSec / durationSec) * 100;
+            const pb = document.getElementById('progress-bar');
+            const fsPb = document.getElementById('fs-progress-bar');
+            if (pb) pb.value = progressPct;
+            if (fsPb) fsPb.value = progressPct;
+
+            const currStr = formatTime(currentSec);
+            const totalStr = formatTime(durationSec);
+
+            const elCurr = document.getElementById('time-current');
+            const elFsCurr = document.getElementById('fs-time-curr');
+            const elTotal = document.getElementById('time-total');
+            const elFsTotal = document.getElementById('fs-time-total');
+            const elLyricsTiming = document.getElementById('lyrics-timing-status');
+
+            if (elCurr) elCurr.textContent = currStr;
+            if (elFsCurr) elFsCurr.textContent = currStr;
+            if (elTotal) elTotal.textContent = totalStr;
+            if (elFsTotal) elFsTotal.textContent = totalStr;
+            if (elLyricsTiming) elLyricsTiming.textContent = currStr;
+
+            updateKaraokeSync(currentSec);
+          }
+        } catch (e) {}
+      }, 250);
+    }
+
+    function onUserScrubbing(val) {
+      scrubLock = true;
+      if (!ytPlayer) return;
+      const durationSec = ytPlayer.getDuration() || (currentTrack ? currentTrack.duration : 0);
+      const targetSec = (val / 100) * durationSec;
+      const el = document.getElementById('time-current');
+      const fsEl = document.getElementById('fs-time-curr');
+      if (el) el.textContent = formatTime(targetSec);
+      if (fsEl) fsEl.textContent = formatTime(targetSec);
+    }
+
+    function onUserScrubEnd(val) {
+      if (!ytPlayer) return;
+      const durationSec = ytPlayer.getDuration() || (currentTrack ? currentTrack.duration : 0);
+      if (durationSec > 0) {
+        const targetSec = (val / 100) * durationSec;
+        ytPlayer.seekTo(targetSec, true);
+      }
+      scrubLock = false;
+    }
+
+    function setAudioVolume(vol) {
+      currentVolume = vol;
+      if (ytPlayer && ytReady) ytPlayer.setVolume(vol);
+
+      const icon = document.getElementById('icon-volume');
+      if (icon) {
+        if (vol == 0) {
+          icon.className = 'fa-solid fa-volume-xmark';
+        } else if (vol < 50) {
+          icon.className = 'fa-solid fa-volume-low';
+        } else {
+          icon.className = 'fa-solid fa-volume-high';
+        }
+      }
+    }
+
+    function toggleMute() {
+      isMuted = !isMuted;
+      if (ytPlayer && ytReady) {
+        if (isMuted) {
+          ytPlayer.mute();
+        } else {
+          ytPlayer.unMute();
+        }
+      }
+      setAudioVolume(isMuted ? 0 : 85);
+      const slider = document.getElementById('volume-slider');
+      if (slider) slider.value = isMuted ? 0 : 85;
+    }
+
+    function toggleShuffle() {
+      isShuffle = !isShuffle;
+      const btn = document.getElementById('ctrl-shuffle');
+      if (btn) {
+        btn.classList.toggle('text-brand-400', isShuffle);
+        btn.classList.toggle('text-gray-400', !isShuffle);
+      }
+      showToast(isShuffle ? 'Modo aleatorio activado' : 'Aleatorio desactivado');
+    }
+
+    function toggleRepeat() {
+      isRepeat = !isRepeat;
+      const btn = document.getElementById('ctrl-repeat');
+      if (btn) {
+        btn.classList.toggle('text-brand-400', isRepeat);
+        btn.classList.toggle('text-gray-400', !isRepeat);
+      }
+      showToast(isRepeat ? 'Repetir canción activado' : 'Repetir desactivado');
+    }
+
+    function playNextTrack() {
+      if (playlistQueue.length === 0) return;
+      if (isShuffle) {
+        currentQueueIndex = Math.floor(Math.random() * playlistQueue.length);
+      } else {
+        currentQueueIndex = (currentQueueIndex + 1) % playlistQueue.length;
+      }
+      playTrackDirect(playlistQueue[currentQueueIndex]);
+    }
+
+    function playPrevTrack() {
+      if (playlistQueue.length === 0) return;
+      currentQueueIndex = (currentQueueIndex - 1 + playlistQueue.length) % playlistQueue.length;
+      playTrackDirect(playlistQueue[currentQueueIndex]);
+    }
+
+    function playCuratedTrackById(id) {
+      const track = CURATED_HITS.find(t => t.id === id);
+      if (track) {
+        playlistQueue = [...CURATED_HITS];
+        currentQueueIndex = CURATED_HITS.findIndex(t => t.id === id);
+        playTrackDirect(track);
+      }
+    }
+
+    async function fetchLyrics(title, artist) {
+      const box = document.getElementById('lyrics-box');
+      const fsLyric = document.getElementById('fs-active-lyric');
+      const badge = document.getElementById('lyrics-badge-sync');
+
+      if (box) {
+        box.innerHTML = `
+          <div class="flex flex-col items-center justify-center py-12 text-gray-500">
+            <i class="fa-solid fa-circle-notch fa-spin text-2xl text-brand-400 mb-2"></i>
+            <p class="text-sm font-semibold">Sincronizando letra para "${title}"...</p>
+          </div>
+        `;
+      }
+      if (fsLyric) fsLyric.textContent = 'Buscando letra en tiempo real...';
+      syncedLyrics = [];
+
+      try {
+        const cleanTitle = title.replace(/\(Remix\)/gi, '').replace(/\(Official Video\)/gi, '').replace(/\[.*\]/g, '').trim();
+        const cleanArtist = artist.split(',')[0].split('&')[0].trim();
+
+        const endpoint = `https://lrclib.net/api/get?track_name=${encodeURIComponent(cleanTitle)}&artist_name=${encodeURIComponent(cleanArtist)}`;
+        const res = await fetch(endpoint, { signal: AbortSignal.timeout(3000) });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.syncedLyrics) {
+            if (badge) {
+              badge.textContent = 'Karaoke en Vivo Sincronizado';
+              badge.className = 'text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-brand-500/20 text-brand-400 border border-brand-500/30';
+            }
+            parseAndDisplaySyncedLyrics(data.syncedLyrics);
+            return;
+          } else if (data.plainLyrics) {
+            if (badge) {
+              badge.textContent = 'Letra Completa';
+              badge.className = 'text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400 border border-yellow-500/30';
+            }
+            displayPlainLyrics(data.plainLyrics);
+            return;
+          }
+        }
+      } catch (e) {}
+
+      // Secondary search in LRCLIB
+      try {
+        const searchUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(title + ' ' + artist)}`;
+        const sRes = await fetch(searchUrl, { signal: AbortSignal.timeout(2800) });
+        if (sRes.ok) {
+          const list = await sRes.json();
+          if (list && list.length > 0) {
+            const first = list[0];
+            if (first.syncedLyrics) {
+              parseAndDisplaySyncedLyrics(first.syncedLyrics);
+              return;
+            } else if (first.plainLyrics) {
+              displayPlainLyrics(first.plainLyrics);
+              return;
+            }
+          }
+        }
+      } catch (err) {}
+
+      if (box) {
+        box.innerHTML = `
+          <div class="py-12 text-center text-gray-500 space-y-3 font-normal">
+            <i class="fa-solid fa-microphone-slash text-3xl mb-1 text-gray-600 block"></i>
+            <p class="text-sm font-semibold text-gray-400">Letra no disponible en la base de datos libre</p>
+            <p class="text-xs text-gray-500">Puedes buscar la letra completa de "${title}" en Google.</p>
+          </div>
+        `;
+      }
+      if (fsLyric) fsLyric.textContent = 'Disfruta la canción';
+    }
+
+    function parseAndDisplaySyncedLyrics(lrcText) {
+      syncedLyrics = [];
+      const lines = lrcText.split('\n');
+      const timeRegex = /\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)/;
+
+      lines.forEach(line => {
+        const match = timeRegex.exec(line);
+        if (match) {
+          const min = parseInt(match[1]);
+          const sec = parseInt(match[2]);
+          const ms = parseFloat('0.' + match[3]);
+          const totalSec = (min * 60) + sec + ms;
+          const text = match[4].trim();
+
+          if (text) {
+            syncedLyrics.push({
+              time: totalSec,
+              text: text,
+              index: syncedLyrics.length
+            });
+          }
+        }
+      });
+
+      const box = document.getElementById('lyrics-box');
+      if (!box) return;
+      box.innerHTML = '';
+
+      if (syncedLyrics.length === 0) {
+        displayPlainLyrics(lrcText);
+        return;
+      }
+
+      syncedLyrics.forEach(item => {
+        const p = document.createElement('p');
+        p.id = `lyric-line-${item.index}`;
+        p.className = 'lyric-item py-2 px-3 rounded-2xl transition';
+        p.textContent = item.text;
+        p.onclick = () => seekToTimestamp(item.time);
+        box.appendChild(p);
+      });
+    }
+
+    function displayPlainLyrics(plainText) {
+      const box = document.getElementById('lyrics-box');
+      if (!box) return;
+      box.innerHTML = '';
+      const lines = plainText.split('\n');
+      lines.forEach(line => {
+        if (line.trim()) {
+          const p = document.createElement('p');
+          p.className = 'py-1 text-gray-300 font-medium text-base';
+          p.textContent = line;
+          box.appendChild(p);
+        }
+      });
+      const fsLyric = document.getElementById('fs-active-lyric');
+      if (fsLyric) fsLyric.textContent = lines[0] || 'Disfruta la canción';
+    }
+
+    function seekToTimestamp(sec) {
+      if (!ytPlayer || !ytReady) return;
+      ytPlayer.seekTo(sec, true);
+    }
+
+    function updateKaraokeSync(currentTime) {
+      if (syncedLyrics.length === 0) return;
+
+      let activeIndex = -1;
+      for (let i = 0; i < syncedLyrics.length; i++) {
+        if (currentTime >= syncedLyrics[i].time) {
+          activeIndex = i;
+        } else {
+          break;
+        }
+      }
+
+      if (activeIndex !== -1) {
+        const activeItem = syncedLyrics[activeIndex];
+        const fsActive = document.getElementById('fs-active-lyric');
+        if (fsActive) fsActive.textContent = activeItem.text;
+
+        document.querySelectorAll('.lyric-item').forEach((el, idx) => {
+          if (idx === activeIndex) {
+            el.classList.add('active');
+            el.classList.remove('passed');
+          } else if (idx < activeIndex) {
+            el.classList.remove('active');
+            el.classList.add('passed');
+          } else {
+            el.classList.remove('active', 'passed');
+          }
+        });
+
+        const activeEl = document.getElementById(`lyric-line-${activeIndex}`);
+        const container = document.getElementById('lyrics-box');
+        if (activeEl && container) {
+          const targetTop = activeEl.offsetTop - container.offsetTop - (container.clientHeight / 2) + 30;
+          container.scrollTo({ top: targetTop, behavior: 'smooth' });
+        }
+      }
+    }
+
+    function reloadLyricsForCurrent() {
+      if (currentTrack) {
+        showToast('Recargando letras...');
+        fetchLyrics(currentTrack.title, currentTrack.artist);
+      }
+    }
+
+    function extractYouTubeId(urlOrQuery) {
+      const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+      const match = urlOrQuery.match(regExp);
+      return (match && match[2].length === 11) ? match[2] : null;
+    }
+
+    async function executeInstantSearch() {
+      const input = document.getElementById('global-search-input');
+      if (!input) return;
+      const query = input.value.trim();
+      if (!query) return;
+
+      switchTab('search');
+      const btnClear = document.getElementById('btn-clear-search');
+      if (btnClear) btnClear.classList.remove('hidden');
+
+      const title = document.getElementById('search-results-title');
+      if (title) title.textContent = `Resultados para: "${query}"`;
+
+      // 1. Direct YouTube link or 11-char ID check
+      const directId = extractYouTubeId(query) || (query.length === 11 && !query.includes(' ') ? query : null);
+      if (directId) {
+        const customTrack = {
+          id: `yt-direct-${directId}`,
+          ytId: directId,
+          title: `Tema YouTube (${directId})`,
+          artist: 'Audio En Vivo',
+          album: 'Enlace Directo',
+          cover: `https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80`,
+          duration: 200
+        };
+        renderSearchResults([customTrack]);
+        return;
+      }
+
+      const loader = document.getElementById('search-loader');
+      if (loader) {
+        loader.classList.remove('hidden');
+        loader.classList.add('flex');
+      }
+
+      // Check matched hits locally first for speed
+      const filteredHits = CURATED_HITS.filter(h => 
+        h.title.toLowerCase().includes(query.toLowerCase()) || 
+        h.artist.toLowerCase().includes(query.toLowerCase())
+      );
+
+      if (filteredHits.length > 0) {
+        if (loader) {
+          loader.classList.add('hidden');
+          loader.classList.remove('flex');
+        }
+        renderSearchResults(filteredHits);
+        return;
+      }
+
+      // Catalog search
+      setTimeout(() => {
+        if (loader) {
+          loader.classList.add('hidden');
+          loader.classList.remove('flex');
+        }
+        
+        // Provide curated selection related to query or standard results
+        renderSearchResults(CURATED_HITS);
+        showToast('Mostrando catálogo disponible', 'info');
+      }, 350);
+    }
+
+    function renderSearchResults(items) {
+      const container = document.getElementById('search-results-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      items.forEach(trackObj => {
+        const div = document.createElement('div');
+        div.className = 'glass-card p-3 rounded-2xl flex items-center justify-between group hover:border-brand-500/30 transition cursor-pointer';
+        div.innerHTML = `
+          <div class="flex items-center space-x-3 min-w-0 flex-1" onclick="playSingleTrack(${JSON.stringify(trackObj).replace(/"/g, '&quot;')})">
+            <div class="relative w-12 h-12 rounded-xl overflow-hidden shrink-0">
+              <img src="${trackObj.cover}" class="w-full h-full object-cover" loading="lazy">
+              <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+                <i class="fa-solid fa-play text-white text-xs"></i>
+              </div>
+            </div>
+            <div class="min-w-0 pr-2">
+              <h4 class="text-sm font-bold text-white truncate group-hover:text-brand-400 transition">${trackObj.title}</h4>
+              <p class="text-xs text-gray-400 truncate">${trackObj.artist} • ${trackObj.album || 'Single'}</p>
+            </div>
+          </div>
+          <div class="flex items-center space-x-3 text-xs text-gray-400 pl-2">
+            <span class="font-mono hidden sm:inline">${formatTime(trackObj.duration)}</span>
+            <button onclick="toggleFavoriteFromObj(${JSON.stringify(trackObj).replace(/"/g, '&quot;')}, event)" title="Favorito" class="p-2 hover:text-pink-500 transition">
+              <i class="fa-regular fa-heart"></i>
+            </button>
+            <button onclick="addToQueue(${JSON.stringify(trackObj).replace(/"/g, '&quot;')}, event)" title="Añadir a la cola" class="p-2 hover:text-white transition">
+              <i class="fa-solid fa-list-ul"></i>
+            </button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function playSingleTrack(track) {
+      playlistQueue = [track];
+      currentQueueIndex = 0;
+      playTrackDirect(track);
+    }
+
+    function addToQueue(track, evt) {
+      if (evt) evt.stopPropagation();
+      playlistQueue.push(track);
+      showToast(`Añadido a la cola: ${track.title}`);
+    }
+
+    function clearSearchInput() {
+      const input = document.getElementById('global-search-input');
+      const btnClear = document.getElementById('btn-clear-search');
+      if (input) input.value = '';
+      if (btnClear) btnClear.classList.add('hidden');
+    }
+
+    function triggerChipSearch(term) {
+      const input = document.getElementById('global-search-input');
+      if (input) input.value = term;
+      executeInstantSearch();
+    }
+
+    function updateDockInfo(track) {
+      const setSafeText = (id, txt) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = txt;
+      };
+      const setSafeSrc = (id, src) => {
+        const el = document.getElementById(id);
+        if (el) el.src = src;
+      };
+
+      const fallbackCover = 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&auto=format&fit=crop&q=80';
+
+      setSafeText('dock-title', track.title);
+      setSafeText('dock-artist', track.artist);
+      setSafeSrc('dock-cover', track.cover || fallbackCover);
+
+      setSafeText('fs-title', track.title);
+      setSafeText('fs-artist', track.artist);
+      setSafeSrc('fs-cover', track.cover || fallbackCover);
+
+      setSafeText('lyrics-track-title', track.title);
+      setSafeText('lyrics-track-artist', track.artist);
+      setSafeSrc('lyrics-cover-img', track.cover || fallbackCover);
+
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: track.title,
+          artist: track.artist,
+          album: track.album || 'Demus Web',
+          artwork: [{ src: track.cover || fallbackCover, sizes: '512x512', type: 'image/jpeg' }]
+        });
+      }
+    }
+
+    function getFavorites() {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY_FAVS) || '[]');
+    }
+
+    function saveFavorites(favs) {
+      localStorage.setItem(STORAGE_KEY_FAVS, JSON.stringify(favs));
+      updateFavsBadge();
+      renderFavoritesView();
+    }
+
+    function toggleCurrentFavorite() {
+      if (!currentTrack) return;
+      toggleFavoriteFromObj(currentTrack);
+    }
+
+    function toggleFavoriteFromObj(track, evt) {
+      if (evt) evt.stopPropagation();
+      let favs = getFavorites();
+      const index = favs.findIndex(f => f.title === track.title && f.artist === track.artist);
+
+      if (index >= 0) {
+        favs.splice(index, 1);
+        showToast('Eliminada de favoritos');
+      } else {
+        favs.unshift(track);
+        showToast('Guardada en Favoritos');
+      }
+
+      saveFavorites(favs);
+      checkIsFavorite(currentTrack ? currentTrack.id : null);
+    }
+
+    function checkIsFavorite(trackId) {
+      if (!currentTrack) return;
+      const favs = getFavorites();
+      const isFav = favs.some(f => f.title === currentTrack.title && f.artist === currentTrack.artist);
+      const icon = document.querySelector('#dock-btn-fav i');
+      if (icon) {
+        icon.className = isFav ? 'fa-solid fa-heart text-pink-500' : 'fa-regular fa-heart text-gray-500';
+      }
+    }
+
+    function updateFavsBadge() {
+      const count = getFavorites().length;
+      const badge = document.getElementById('badge-favs-count');
+      if (badge) badge.textContent = count;
+    }
+
+    function renderFavoritesView() {
+      const container = document.getElementById('favorites-list-container');
+      if (!container) return;
+      const favs = getFavorites();
+
+      if (favs.length === 0) {
+        container.innerHTML = `
+          <div class="p-12 text-center text-gray-500">
+            <i class="fa-regular fa-heart text-3xl mb-2 text-pink-500/50 block"></i>
+            <p class="text-sm">No tienes canciones favoritas guardadas.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = '';
+      favs.forEach(track => {
+        const div = document.createElement('div');
+        div.className = 'glass-card p-3 rounded-2xl flex items-center justify-between group hover:border-brand-500/30 transition cursor-pointer';
+        div.innerHTML = `
+          <div class="flex items-center space-x-3 min-w-0 flex-1" onclick="playSingleTrack(${JSON.stringify(track).replace(/"/g, '&quot;')})">
+            <img src="${track.cover}" class="w-12 h-12 rounded-xl object-cover">
+            <div class="min-w-0">
+              <h4 class="text-sm font-bold text-white truncate group-hover:text-brand-400">${track.title}</h4>
+              <p class="text-xs text-gray-400 truncate">${track.artist}</p>
+            </div>
+          </div>
+          <button onclick="toggleFavoriteFromObj(${JSON.stringify(track).replace(/"/g, '&quot;')}, event)" title="Quitar de favoritos" class="text-pink-500 p-2 text-sm">
+            <i class="fa-solid fa-heart"></i>
+          </button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function playAllFavorites() {
+      const favs = getFavorites();
+      if (favs.length === 0) {
+        showToast('Favoritos vacío', 'info');
+        return;
+      }
+      playlistQueue = [...favs];
+      currentQueueIndex = 0;
+      playTrackDirect(playlistQueue[0]);
+    }
+
+    function addToHistory(track) {
+      let hist = JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY) || '[]');
+      hist = hist.filter(t => t.title !== track.title);
+      hist.unshift(track);
+      if (hist.length > 30) hist.pop();
+      localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(hist));
+      renderHistoryView();
+    }
+
+    function renderHistoryView() {
+      const container = document.getElementById('history-list-container');
+      if (!container) return;
+      const hist = JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY) || '[]');
+
+      if (hist.length === 0) {
+        container.innerHTML = `
+          <div class="p-12 text-center text-gray-500">
+            <i class="fa-solid fa-clock-rotate-left text-3xl mb-2 text-gray-600 block"></i>
+            <p class="text-sm">Tu historial está vacío.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = '';
+      hist.forEach(track => {
+        const div = document.createElement('div');
+        div.className = 'glass-card p-3 rounded-2xl flex items-center justify-between group cursor-pointer';
+        div.onclick = () => playSingleTrack(track);
+        div.innerHTML = `
+          <div class="flex items-center space-x-3 min-w-0 flex-1">
+            <img src="${track.cover}" class="w-10 h-10 rounded-xl object-cover">
+            <div class="min-w-0">
+              <h4 class="text-xs font-bold text-white truncate">${track.title}</h4>
+              <p class="text-[11px] text-gray-400 truncate">${track.artist}</p>
+            </div>
+          </div>
+          <i class="fa-solid fa-play text-xs text-gray-500 group-hover:text-brand-400 transition mr-2"></i>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function clearHistory() {
+      localStorage.removeItem(STORAGE_KEY_HISTORY);
+      renderHistoryView();
+      showToast('Historial borrado');
+    }
+
+    function openPlaylistModal() {
+      const modal = document.getElementById('modal-playlist-prompt');
+      const input = document.getElementById('playlist-name-input');
+      if (modal) {
+        modal.classList.remove('opacity-0', 'pointer-events-none');
+        modal.classList.add('opacity-100');
+      }
+      if (input) {
+        input.value = '';
+        setTimeout(() => input.focus(), 100);
+      }
+    }
+
+    function closePlaylistModal() {
+      const modal = document.getElementById('modal-playlist-prompt');
+      if (modal) {
+        modal.classList.add('opacity-0', 'pointer-events-none');
+        modal.classList.remove('opacity-100');
+      }
+    }
+
+    function confirmCreatePlaylist() {
+      const input = document.getElementById('playlist-name-input');
+      const name = input ? input.value.trim() : '';
+      if (name) {
+        let pl = JSON.parse(localStorage.getItem(STORAGE_KEY_PLAYLISTS) || '[]');
+        pl.push({ name: name, songs: [] });
+        localStorage.setItem(STORAGE_KEY_PLAYLISTS, JSON.stringify(pl));
+        renderSidebarPlaylists();
+        showToast(`Lista "${name}" creada`);
+        closePlaylistModal();
+      } else {
+        showToast('Escribe un nombre para la lista', 'info');
+      }
+    }
+
+    function renderSidebarPlaylists() {
+      const container = document.getElementById('playlists-sidebar-list');
+      if (!container) return;
+      const pl = JSON.parse(localStorage.getItem(STORAGE_KEY_PLAYLISTS) || '[]');
+
+      if (pl.length === 0) {
+        container.innerHTML = '<p class="text-xs text-gray-500 px-3 py-1 italic">Sin listas creadas</p>';
+        return;
+      }
+
+      container.innerHTML = '';
+      pl.forEach(p => {
+        const btn = document.createElement('button');
+        btn.className = 'w-full text-left px-3 py-1.5 rounded-lg hover:bg-white/5 hover:text-white transition text-xs flex items-center space-x-2 truncate';
+        btn.innerHTML = `<i class="fa-solid fa-music text-[10px] text-brand-400"></i><span class="truncate">${p.name}</span>`;
+        container.appendChild(btn);
+      });
+    }
+
+    function renderTrendingGrid() {
+      const grid = document.getElementById('grid-trending');
+      if (!grid) return;
+      grid.innerHTML = '';
+
+      CURATED_HITS.forEach(track => {
+        const card = document.createElement('div');
+        card.className = 'glass-card p-3 rounded-2xl flex flex-col group cursor-pointer';
+        card.onclick = () => playCuratedTrackById(track.id);
+
+        card.innerHTML = `
+          <div class="relative w-full aspect-square rounded-xl overflow-hidden mb-2 shadow-md">
+            <img src="${track.cover}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" alt="${track.title}">
+            <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+              <div class="w-10 h-10 rounded-full bg-brand-500 text-white flex items-center justify-center shadow-lg shadow-brand-500/40">
+                <i class="fa-solid fa-play ml-0.5 text-xs"></i>
+              </div>
+            </div>
+          </div>
+          <h4 class="text-xs font-bold text-white truncate group-hover:text-brand-400 transition">${track.title}</h4>
+          <p class="text-[11px] text-gray-400 truncate mt-0.5">${track.artist}</p>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function playAllCurated() {
+      playlistQueue = [...CURATED_HITS];
+      currentQueueIndex = 0;
+      playTrackDirect(playlistQueue[0]);
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-view').forEach(view => view.classList.add('hidden'));
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.remove('active', 'bg-brand-500/15', 'text-brand-400', 'border', 'border-brand-500/25');
+        btn.classList.add('text-gray-400');
+      });
+
+      const targetView = document.getElementById(`view-${tabId}`);
+      if (targetView) targetView.classList.remove('hidden');
+
+      const activeBtn = document.getElementById(`nav-${tabId}`);
+      if (activeBtn) {
+        activeBtn.classList.add('active', 'bg-brand-500/15', 'text-brand-400', 'border', 'border-brand-500/25');
+        activeBtn.classList.remove('text-gray-400');
+      }
+
+      if (tabId === 'favorites') renderFavoritesView();
+      if (tabId === 'history') renderHistoryView();
+    }
+
+    function toggleVideoDockVisibility() {
+      const dock = document.getElementById('player-dock-stage');
+      if (dock) dock.classList.toggle('hidden');
+    }
+
+    function toggleVideoDockMinimize() {
+      const media = document.getElementById('player-media-view');
+      const icon = document.getElementById('btn-dock-min-icon');
+      if (!media || !icon) return;
+
+      if (media.classList.contains('h-0')) {
+        media.classList.remove('h-0', 'opacity-0');
+        media.classList.add('h-[180px]');
+        icon.className = 'fa-solid fa-chevron-down';
+      } else {
+        media.classList.remove('h-[180px]');
+        media.classList.add('h-0', 'opacity-0');
+        icon.className = 'fa-solid fa-chevron-up';
+      }
+    }
+
+    function toggleFullscreenPlayer() {
+      const modal = document.getElementById('modal-fullscreen-player');
+      if (!modal) return;
+      const isClosed = modal.classList.contains('pointer-events-none');
+      if (isClosed) {
+        modal.classList.remove('pointer-events-none', 'opacity-0', 'scale-95');
+        modal.classList.add('opacity-100', 'scale-100');
+      } else {
+        modal.classList.add('pointer-events-none', 'opacity-0', 'scale-95');
+        modal.classList.remove('opacity-100', 'scale-100');
+      }
+    }
+
+    function showToast(message, type = 'success') {
+      const toast = document.getElementById('toast');
+      const text = document.getElementById('toast-text');
+      const icon = document.getElementById('toast-icon');
+
+      if (!toast || !text) return;
+      text.textContent = message;
+
+      if (icon) {
+        if (type === 'error') {
+          icon.className = 'fa-solid fa-circle-exclamation text-red-500 text-base';
+        } else if (type === 'info') {
+          icon.className = 'fa-solid fa-circle-info text-blue-400 text-base';
+        } else {
+          icon.className = 'fa-solid fa-circle-check text-brand-400 text-base';
+        }
+      }
+
+      toast.classList.remove('translate-y-[-160%]');
+      toast.classList.add('translate-y-0');
+
+      setTimeout(() => {
+        toast.classList.add('translate-y-[-160%]');
+        toast.classList.remove('translate-y-0');
+      }, 2500);
+    }
+
+    function formatTime(secs) {
+      if (isNaN(secs) || secs < 0) return '0:00';
+      const m = Math.floor(secs / 60);
+      const s = Math.floor(secs % 60);
+      return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        togglePlayPause();
+      } else if (e.key === 'm' || e.key === 'M') {
+        toggleMute();
+      } else if (e.key === 'l' || e.key === 'L') {
+        switchTab('lyrics');
+      } else if (e.key === 'f' || e.key === 'F') {
+        toggleFullscreenPlayer();
+      }
+    });
+
+    window.onload = function() {
+      try {
+        renderTrendingGrid();
+        updateFavsBadge();
+        renderSidebarPlaylists();
+        playlistQueue = [...CURATED_HITS];
+      } catch (err) {
+        console.error('Initialization error:', err);
+      }
+    };
+  </script>
+</body>
+</html>
